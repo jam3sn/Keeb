@@ -1,22 +1,8 @@
 #include QMK_KEYBOARD_H
 
-bool glowRed = false;
-bool glowPurple = false;
-
-enum colors {
-  WHITE,
-  RED,
-  PURPLE
-};
-
-// Set RGB color
-void keyboard_post_init_user(void) {
-  rgblight_enable_noeeprom();
-  rgblight_sethsv_noeeprom(HSV_WHITE);
-  rgblight_mode_noeeprom(RGBLIGHT_MODE_STATIC_LIGHT);
-}
-
-// Bindings
+/**
+ * Bindings
+ */
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   [0] = LAYOUT(
               KC_MUTE,
@@ -25,62 +11,76 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   )
 };
 
-// Volume up/down on the encoder
-bool encoder_update_user(uint8_t index, bool clockwise) {
-  if (clockwise) {
-    tap_code_delay(KC_VOLU, 10);
-  }
-  else {
-    tap_code_delay(KC_VOLD, 10);
-  }
+/**
+ * Color management
+ */
+enum COLORS {
+  WHITE,
+  RED,
+  PURPLE,
+  COLORS_COUNT,
+};
 
-  return true;
-}
+const uint8_t colorMapping[3][3] = {
+  {HSV_WHITE},
+  {HSV_RED},
+  {HSV_PURPLE},
+};
 
-void ledWhite(void) {
+bool activeColors[COLORS_COUNT] = {true, false, false};
+
+/**
+ * Set base lighting
+ * 
+ * @return void
+ */
+void keyboard_post_init_user(void) {
+  rgblight_enable_noeeprom();
   rgblight_sethsv_noeeprom(HSV_WHITE);
   rgblight_mode_noeeprom(RGBLIGHT_MODE_STATIC_LIGHT);
 }
 
-void ledRed(void) {
-  rgblight_sethsv_noeeprom(HSV_RED);
-  rgblight_mode_noeeprom(RGBLIGHT_MODE_ALTERNATING);
+/**
+ * Volume up/down on the encoder
+ * 
+ * @param uint8_t index
+ * @param bool clockwise
+ * @return bool
+ */
+bool encoder_update_user(uint8_t index, bool clockwise) {
+  tap_code_delay(clockwise ? KC_VOLU : KC_VOLD, 10);
+  return true;
 }
 
-void ledPurple(void) {
-  rgblight_sethsv_noeeprom(HSV_PURPLE);
-  rgblight_mode_noeeprom(RGBLIGHT_MODE_ALTERNATING);
-}
+/**
+ * Handle button color state
+ * 
+ * @param enum COLORS color - Color to toggle.
+ * @return void
+ */ 
+void handle_rgb_rgb(enum COLORS color) {
+  activeColors[color] = !activeColors[color];
 
-// Handle RGB based on button
-void handle_rgb_rgb(enum colors color) {
-  if (color == RED) {
-    if (glowRed == true && glowPurple == true) {
-      ledPurple();
-      glowRed = false;
-    } else if (glowRed == true && glowPurple== false) {
-      ledWhite();
-      glowRed = false;
-    } else {
-      ledRed();
-      glowRed = true;
-    }
-  } else if (color == PURPLE) {
-    if (glowPurple == true && glowRed == true) {
-      ledRed();
-      glowPurple = false;
-    } else if (glowPurple == true && glowRed == false) {
-      ledWhite();
-      glowPurple = false;
-    } else {
-      ledPurple();
-      glowPurple = true;
+  for (int i = COLORS_COUNT-1; i >= 0; i--) {
+    if (activeColors[i]) {
+      rgblight_sethsv_noeeprom(colorMapping[i][0], colorMapping[i][1], colorMapping[i][2]);
+
+      (i == WHITE) ?
+        rgblight_mode_noeeprom(RGBLIGHT_MODE_STATIC_LIGHT) :
+        rgblight_mode_noeeprom(RGBLIGHT_MODE_ALTERNATING);
+
+      break;
     }
   }
 }
 
-
-// Execute Macros
+/**
+ * Handle additional button functions
+ * 
+ * @param uint16_t keycode
+ * @param keyrecord_t *record
+ * @return void
+ */
 void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
   if (record->event.pressed) {
     switch (keycode)
